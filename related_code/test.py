@@ -80,12 +80,12 @@ if __name__ == '__main__':
           predicted_ids.extend(idx_batch.cpu().numpy())
           outcome_labels.extend(label_batch.cpu().numpy())
   pred_probs  = torch.sigmoid(label_pred).cpu().numpy()
-  predicted_sample_ids  = sample_id[ids_predetti]
-  outcome_labels_np = np.array(etichetta_outcome)
+  predicted_sample_ids  = sample_id[predicted_ids]
+  outcome_labels_np = np.array(outcome_labels)
   predictions_df = pd.DataFrame({
-    'sample_id': sample_id_predetti, 
-    'pred_prob': label_sigmoids, 
-    'outcome': etichetta_outcome_np
+    'sample_id': predicted_sample_ids, 
+    'pred_prob': pred_probs, 
+    'outcome': outcome_labels_np
   })
   predictions_df.to_csv('predictions.csv', index = False)
   
@@ -195,5 +195,6 @@ if __name__ == '__main__':
   print('Time: {} [{},{}] std: {}'.format(round(times_mean), round(times_lci), round(times_uci), round(times_std)))
   print('Done')
 """  
+
 
 
