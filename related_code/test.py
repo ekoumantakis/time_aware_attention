@@ -25,14 +25,20 @@ def round(num):
 if __name__ == '__main__':
   # Load data
   print('Load data...')
-  data = np.load(hp.data_dir + 'data_arrays.npz')
+  data = np.load(hp.data_dir + 'data_arrays.npz', allow_pickle = True)
   test_ids_patients = pd.read_pickle(hp.data_dir + 'test_ids_patients.pkl')
-  
+  print(len(test_ids_patients))
+  print(test_ids_patients.head())
   # Patients in test data
+  sample_id = data['sample_id']
+  test_ids = data['test_ids']
+  sample_id = sample_id[test_ids]
   patients = test_ids_patients.drop_duplicates()
   num_patients = patients.shape[0]
   row_ids = pd.DataFrame({'ROW_IDX': test_ids_patients.index}, index=test_ids_patients)
-  
+  print(row_ids.head())
+  num_true = test_ids.sum()
+  print(f"Number of True in test_ids: {num_true}")
   # Vocabulary sizes
   num_static = num_static(data)
   num_dp_codes, num_cp_codes = vocab_sizes(data)
@@ -52,6 +58,38 @@ if __name__ == '__main__':
   # Restore variables from disk
   net.load_state_dict(torch.load(logdir + 'final_model.pt', map_location=device))
 
+  net.eval() # From here onward, the code was modified to retrieve predictions on the test set without bootstrapping.
+  label_pred = torch.Tensor([])
+  label_test = torch.Tensor([])
+  predicted_ids = []
+  outcome_labels = []
+
+  # testloader, _, _ = get_trainloader(data, 'TEST', shuffle=False, drop_last=False) # Previous version
+  testloader, _, _ = get_testloader(data, shuffle=False) # Use a dedicated test loader to also evaluate patients in the last batch, which would otherwise be dropped.
+  with torch.no_grad():
+      for stat, dp, cp, dp_t, cp_t, label_batch, idx_batch in tqdm(testloader):
+          stat  = stat.to(device)
+          dp    = dp.to(device)
+          cp    = cp.to(device)
+          dp_t  = dp_t.to(device)
+          cp_t  = cp_t.to(device)
+
+          label_pred_batch, _ = net(stat, dp, cp, dp_t, cp_t)
+          label_pred = torch.cat((label_pred, label_pred_batch.cpu()))
+          label_test = torch.cat((label_test, label_batch))
+          predicted_ids.extend(idx_batch.cpu().numpy())
+          outcome_labels.extend(label_batch.cpu().numpy())
+  pred_probs  = torch.sigmoid(label_pred).cpu().numpy()
+  predicted_sample_ids  = sample_id[ids_predetti]
+  outcome_labels_np = np.array(etichetta_outcome)
+  predictions_df = pd.DataFrame({
+    'sample_id': sample_id_predetti, 
+    'pred_prob': label_sigmoids, 
+    'outcome': etichetta_outcome_np
+  })
+  predictions_df.to_csv('predictions.csv', index = False)
+  
+"""
   # Bootstrapping
   np.random.seed(hp.np_seed)
   avpre_vec = np.zeros(hp.bootstrap_samples)
@@ -156,5 +194,6 @@ if __name__ == '__main__':
   print('Specificity: {} [{},{}]'.format(round(specificity_mean), round(specificity_lci), round(specificity_uci)))
   print('Time: {} [{},{}] std: {}'.format(round(times_mean), round(times_lci), round(times_uci), round(times_std)))
   print('Done')
-  
+"""  
+
 
