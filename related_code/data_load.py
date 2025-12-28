@@ -60,7 +60,10 @@ def get_trainloader(data, type, shuffle=True, idx=None):
   # Bootstrap
   if idx is not None:
     static, dp, cp, dp_times, cp_times, label = static[idx], dp[idx], cp[idx], dp_times[idx], cp_times[idx], label[idx]
-
+    dataset_indices = np.arange(len(label))
+  else:
+    dataset_indices = np.arange(len(label))
+  
   # Compute total batch count
   num_batches = len(label) // hp.batch_size
   
@@ -70,7 +73,8 @@ def get_trainloader(data, type, shuffle=True, idx=None):
                                 torch.from_numpy(cp),
                                 torch.from_numpy(dp_times),
                                 torch.from_numpy(cp_times),
-                                torch.from_numpy(label))
+                                torch.from_numpy(label),
+                                torch.from_numpy(dataset_indices))
 
   # Create batch queues
   trainloader = utils.DataLoader(dataset,
@@ -84,7 +88,32 @@ def get_trainloader(data, type, shuffle=True, idx=None):
   pos_weight = torch.tensor((len(label) - np.sum(label))/np.sum(label))
   
   return trainloader, num_batches, pos_weight
-  
+
+def get_testloader(data, shuffle=False, idx=None): #To avoid drop of the last batch on testing
+    static, dp, cp, dp_times, cp_times, label = get_data(data, 'TEST')
+    if idx is not None:
+        static, dp, cp, dp_times, cp_times, label = static[idx], dp[idx], cp[idx], dp_times[idx], cp_times[idx], label[idx]
+        dataset_indices = np.arange(len(label))
+    else:
+        dataset_indices = np.arange(len(label))
+
+    dataset = utils.TensorDataset(torch.from_numpy(static), 
+                                  torch.from_numpy(dp),
+                                  torch.from_numpy(cp),
+                                  torch.from_numpy(dp_times),
+                                  torch.from_numpy(cp_times),
+                                  torch.from_numpy(label),
+                                  torch.from_numpy(dataset_indices))
+
+    testloader = utils.DataLoader(dataset,
+                                 batch_size=hp.batch_size,
+                                 shuffle=shuffle,
+                                 num_workers=2,
+                                 drop_last=False)  # Qui il cambio importante
+
+    pos_weight = torch.tensor((len(label) - np.sum(label)) / np.sum(label))
+    num_batches = len(label) // hp.batch_size
+    return testloader, num_batches, pos_weight
   
 if __name__ == '__main__':
   print('Load data...')
@@ -92,4 +121,5 @@ if __name__ == '__main__':
   trainloader, num_batches, pos_weight = get_trainloader(data, 'TRAIN')
   # vocab_diagnoses, vocab_procedures, vocab_prescriptions = vocab_sizes(data)
   
+
   
